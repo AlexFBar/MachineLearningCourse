@@ -1,0 +1,130 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Alexandre Barros (AlexFBar)"
+date: "24 de outubro de 2015"
+output: html_document
+---
+
+##1.Description
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, we will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. This report describe how built the model, how use cross validation, what is the expected out of sample error, and the choices did. Here we use the prediction model to predict 20 different test cases and submit to evaluate in Project Class.
+
+##2.About the Data
+
+The training data for this project are available in this link: 
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)
+
+The test data are available in this link: 
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv)
+
+The data for this project come from this source: [http://groupware.les.inf.puc-rio.br/har](http://groupware.les.inf.puc-rio.br/har).
+
+```{r}
+#Load the train and final test data set on local default directory
+#We use na.string to substitute the missing data for NA value
+train<-read.csv("pml-training.csv",na.string=c("NA","#DIV/0!",""))
+test<-read.csv("pml-testing.csv",na.string=c("NA","#DIV/0!",""))
+```
+        
+##3.Preprocessing
+
+###3.1.Cleaning Data
+
+```{r}
+#Eliminate all variables with only NA values in train data set
+train<-train[,colSums(is.na(train))==0]
+
+#Removing the unecessary variables for model:
+#   X,user_name,raw_timestamp_part_1,raw_timestamp_part_2,cvtd_timestamp,new_window,num_window
+#these are the seven first columns in train data set
+train<-train[,-c(1:7)]
+```
+
+###3.2.Partition of Training Set
+
+The "caret" package is used to help us with machine learning data.
+
+```{r}
+library(caret)
+```
+
+Now we can make the partition of train data set using 80% for cross validation. We split train in training and validation data sets.
+
+```{r}
+set.seed(999) #to make this reproductible
+trainData<-createDataPartition(train$classe,p=0.8,list=FALSE)
+training<-train[trainData,]
+validation<-train[-trainData,]
+```
+
+##4.Model Train
+
+We can use the Random Forest and Recursive Partitioning algorithms to choose the best model accuracy.
+
+```{r}
+library(rpart)
+library(randomForest)
+```
+
+Fit the models where outcome variable is "classe" from training data set.
+
+```{r}
+fitModelRP<-rpart(classe~.,data=training,method="class")
+fitModelRF<-randomForest(classe~.,data=training,method="class")
+```
+
+##5.Model Choose Accuracy 
+
+Now we can predict data using training data set to view the accuracy and choose the best model.
+
+```{r}
+RPModelTrain<-predict(fitModelRP,training,type="class")
+confusionMatrix(RPModelTrain,training$classe)
+```
+
+```{r}
+RFModelTrain<-predict(fitModelRF,training,type="class")
+confusionMatrix(RFModelTrain,training$classe)
+```
+
+_Conlcusion:_ The Random Forest is the best model because acurracy is 1, the Recursive Partitioning algorithm cause only 0.75 of accuracy.
+
+##6.Model Cross Validation
+
+Using the best model of Random Forest algorithm, we will predict using the validation data set. The validation data set is a "out-of the box" values of original train data set.
+
+```{r}
+RFModelValidation<-predict(fitModelRF,validation,type="class")
+confusionMatrix(RFModelValidation,validation$classe)
+```
+
+_Conclusion:_ Checking the accuracy, we will get the value of 0.9969. The error is calculated by 1-Accuracy considering the confidence interval (95%), the value is about 0.005 or 0,5%. This demonstrate a good model to execute the prediction on the test original data set.
+
+##7.Model Test
+
+Now we can predict "classe" value using the original test data set downloaded for this project and the Random Forest Model based on train data set.
+
+```{r}
+RFModelTest<-predict(fitModelRF,test,type="class")
+RFModelTest
+```
+
+This is the final result of this project.
+
+##8.Project Submission
+
+For submission of the result, we nedd to create 20 files each one with a result letter of classe prediction.
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(RFModelTest)
+```
